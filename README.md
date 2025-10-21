@@ -29,6 +29,11 @@ An improved version of the original **WaveformSeekbar** plugin, with two additio
 View your file tree when renaming your library
 ![RenamingTreeView Plugin](screenshots/editing-renamingtreeview.png)
 
+#### RenamingPathPrune
+
+For path components containing multiple values (tags separated by commas) while renaming files, this plugin intelligently selects a single value based on defined preference and avoidance rules.
+
+
 ## Installing
 
 * Copy the `.py` files into your personal QuodLibet plugins folder (usually `~/.config/quodlibet/plugins/` on Linux and Mac) with the corresponding subfolder (`editing`, `events`, `songsmenu`, etc.)  
