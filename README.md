@@ -12,17 +12,22 @@ Filter your paned browser with multiple selections, using a **logical AND** inst
 Ideal for multi-tagged songs (`<genre>`, `<grouping>`, `<language>`,etc).  
 A button is added at the right hand top of the paned browser to switch between `AND` (`&`) and `OR` (`||`) logic.
 
+![Conjunction Plugin](screenshots/events-conjunction.png)
+
 #### WaveformSeekbar2
 
 An improved version of the original **WaveformSeekbar** plugin, with two additional options:
 * Displays only _half of the waveform_ (usually symmetrical, which is 50% wasted space)
 * Applying _compression to the curve_ to better visualize quiet sounds (useful for pieces with high dynamics, such as classical music).
 
+![WaveformSeekbar2 Plugin](screenshots/events-waveformseekbar2.png)
+
 ### /editing/
 
 #### RenamingTreeView
 
 View your file tree when renaming your library
+![RenamingTreeView Plugin](screenshots/editing-renamingtreeview.png)
 
 ## Installing
 
