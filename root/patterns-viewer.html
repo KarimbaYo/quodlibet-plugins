@@ -1,0 +1,708 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Quodlibet Patterns Viewer</title>
+    <style>
+        * {
+            box-sizing: border-box;
+        }
+        html {
+            height:100%;
+        }
+        body {
+            font-family: monospace;
+            background-color: #2c2f33;
+            color: #dcdcdc;
+            display: flex;
+            height:100%;
+            align-items: stretch;
+            justify-content: center;
+            margin: 0;
+            padding: 10px;
+            width:100%;
+            height:100%;
+        }
+
+        .container {
+            background-color: #3e4451;
+            padding: 10px;
+            border-radius: 12px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            display: flex;
+            align-items: stretch;
+            flex-direction: column;
+            gap: 10px;
+            width: 100%;
+            flex:1 1 auto;
+        }
+
+        .controls {
+            display: flex;
+            align-items: stretch;
+            flex-direction: column;
+            gap: 10px;
+            flex: 0 0 auto;
+        }
+
+        .output-container {
+            display: flex;
+            align-items: flex-start;
+            flex: 1 1 auto;
+            overflow: auto;
+        }
+
+        #inputString {
+            width: 100%;
+            height: 80px;
+            background-color: #282a2e;
+            color: #abb2bf;
+            border: 1px solid #4a4d52;
+            border-radius: 8px;
+            padding: 10px;
+            font-family: monospace;
+            resize: vertical;
+            box-sizing: border-box;
+            flex: 1 0 auto;
+            overflow-y: auto;
+        }
+
+        #output {
+            display: flex;
+            align-items: center;
+            position: relative;
+            background-color: #282a2e;
+            padding: 15px;
+            border-radius: 8px;
+            font-family: trebuchet, sans-serif;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            line-height: 1.2;
+            min-height: 100%;
+            border: 1px solid #4a4d52;
+            flex: 1 1 auto;
+        }
+
+        .wrapper {
+            display: flex;
+            align-items: center;
+            border: 1px solid #4a4d52;
+            padding: 2px 5px;
+            margin:2px;
+            border-radius: 5px;
+            cursor: pointer;
+        }
+        .qltag, .text, .slash, .expression {
+            cursor: pointer;
+        }
+
+        .selection {
+            background-color: rgba(255,255,255,0.08) !important;
+            border-color: #0AF !important;
+        }
+
+        .qltag,
+        .text,
+        .slash,
+        .condition,
+        .format-start,
+        .format-end,
+        .colon {
+            display: inline-block;
+            background: #000;
+            border: 1px solid #555;
+            font-family: monospace;
+            padding: 2px 4px;
+            font-size: 1.1em;
+        }
+
+        .text {
+            color: #FFF;
+            white-space: nowrap;
+        }
+
+        .space {
+            display: inline-block;
+            height: 10px;
+            width: 10px;
+            vertical-align: middle;
+            margin: 0 2px;
+            outline: 1px solid rgba(200, 200, 255, 0.4);
+        }
+
+        .slash,
+        .colon {
+            color: #FF0;
+            font-weight: bold;
+        }
+        .colon {
+            color: #0FF;
+        }
+
+        .slash:before,
+        .colon:before {
+            content: "";
+            display:block;
+            position:absolute;
+            top:0;
+            bottom:0;
+            margin-top: 4px;
+            width:10px;
+            height:auto;
+            background: rgba(255,255,0,0.1);
+        }
+        .colon:before {
+            background: rgba(0,255,255,0.1);
+        }
+
+        .condition {
+            color: #FC0;
+            background: none;
+            margin: 0 10px 0 5px;
+            border-radius: 6px;
+            white-space: nowrap;
+        }
+        .condition:after {
+            content: " ?";
+            opacity:0.6;
+        }
+
+        .numeric {
+            color: #BE0;
+        }
+
+        .expression {
+            display: flex;
+            align-items: center;
+            border: 3px solid;
+            border-radius: 8px;
+            min-height: 18px;
+            padding: 2px;
+        }
+
+        .expression.ok {
+            border-color: #0D0;
+        }
+
+        .expression.ko {
+            border-color: #D00;
+        }
+
+        .qltag {
+            color: #C8F;
+        }
+
+        .quoted-string {
+            color: #FF0;
+            font-family: monospace;
+            font-size: 1.1em;
+            vertical-align: middle;
+        }
+
+        .consequent {
+            display: flex;
+            flex-direction: column;
+            position: relative;
+            gap: 4px;
+            padding: 4px;
+        }
+
+        /* New styles for fallback chain */
+        .fallbackchain {
+            border: 2px solid #F70;
+            flex-direction: column;
+            align-items: stretch;
+            padding: 0;
+        }
+        .fallbackchain .alternate {
+            display: flex;
+            align-items: center;
+            border-bottom: 1px solid #F70;
+            padding: 3px;
+            text-align:center;
+        }
+        .fallbackchain .alternate:last-child {
+            border-bottom:none;
+        }
+
+        /* New styles for XHTML-like tags */
+        .format-start,
+        .format-end {
+            color: #0CF;
+            font-weight: bold;
+            white-space: nowrap;
+        }
+
+        .slash:first-child,
+        .text:first-child,
+        .qltag:first-child,
+        .wrapper + .slash,
+        .wrapper + .text,
+        .wrapper + .qltag,
+        .format-start:first-child,
+        .format-end:first-child,
+        .colon-end:first-child {
+            border-top-left-radius: 6px;
+            border-bottom-left-radius: 6px;
+            margin-left:2px;
+        }
+        .slash:last-child,
+        .text:last-child,
+        .qltag:last-child,
+        .slash:has(+ .wrapper),
+        .text:has(+ .wrapper),
+        .qltag:has(+ .wrapper),
+        .format-start:last-child,
+        .format-end:last-child,
+        .colon-end:last-child {
+            border-top-right-radius: 6px;
+            border-bottom-right-radius: 6px;
+            margin-right:2px;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <div class="controls">
+            <textarea id="inputString">/Music/<genre|<genre>|Unclassified>/<<composer>||<albumartist>||<artist>>/<year> - <album>/<discnumber|CD <discnumber>/><tracknumber>. <title>.mp3</textarea>
+        </div>
+        <div class="output-container">
+            <div id="output"></div>
+        </div>
+    </div>
+
+    <script>
+        let timeout = null;
+
+        function escapeHtml(text) {
+            return text.replace(/&/g, "&amp;")
+                       .replace(/</g, "&lt;")
+                       .replace(/>/g, "&gt;")
+                       .replace(/"/g, "&quot;")
+                       .replace(/'/g, "&#039;");
+        }
+
+        function highlightQuotedStrings(text) {
+            return text.replace(/"([^"]*)"|'([^']*)'/g, (match) => {
+                return `<span class="quoted-string">${escapeHtml(match)}</span>`;
+            });
+        }
+
+        function processNumericExpression(text) {
+            return text.replace(/\\(>|<|&)/g, (match) => {
+                switch(match) {
+                    case '\\>': return '>';
+                    case '\\<': return '<';
+                    case '\\&': return '&';
+                    default: return match;
+                }
+            });
+        }
+
+        function parseExpressions(tagContent, offset) {
+            const expressions = [];
+            let subBalance = 0;
+            let lastSplit = 0;
+            let inNumericExpression = false;
+            let isFallback = tagContent.includes('||');
+
+            for (let j = 0; j < tagContent.length; j++) {
+                const subChar = tagContent[j];
+                const prevSubChar = tagContent[j - 1];
+                const nextSubChar = tagContent[j + 1];
+
+                if (subChar === '<' && prevSubChar !== '\\' && !inNumericExpression) subBalance++;
+                else if (subChar === '>' && prevSubChar !== '\\' && !inNumericExpression) subBalance--;
+                else if (subChar === '[' && prevSubChar !== '\\' && (nextSubChar && nextSubChar.match(/[a-zA-Z\/]/)) && !inNumericExpression) subBalance++;
+                else if (subChar === ']' && prevSubChar !== '\\' && !inNumericExpression) subBalance--;
+
+                if (subChar === '#' && j + 1 < tagContent.length && tagContent[j+1] === '(') { inNumericExpression = true; }
+                if (subChar === ')') { inNumericExpression = false; }
+
+                if (subBalance === 0 && !inNumericExpression) {
+                    if (isFallback && j + 1 < tagContent.length && tagContent.substring(j, j + 2) === '||') {
+                         expressions.push({ type: 'expression', value: tagContent.substring(lastSplit, j), start: offset + lastSplit, end: offset + j, delimiterStart: offset + j, delimiterEnd: offset + j + 2, isFallback: true });
+                         lastSplit = j + 2;
+                         j++;
+                    } else if (!isFallback && subChar === '|') {
+                        expressions.push({ type: 'expression', value: tagContent.substring(lastSplit, j), start: offset + lastSplit, end: offset + j, delimiterStart: offset + j, delimiterEnd: offset + j + 1, isFallback: false });
+                        lastSplit = j + 1;
+                    }
+                }
+            }
+            expressions.push({ type: 'expression', value: tagContent.substring(lastSplit), start: offset + lastSplit, end: offset + tagContent.length, isFallback: isFallback });
+            return expressions;
+        }
+
+        function parseSubContent(content, offset = 0) {
+            const parts = [];
+            let lastIndex = 0;
+            for (let i = 0; i < content.length; i++) {
+                const char = content[i];
+                const nextChar = content[i+1];
+
+                // Case 1: Path slash /
+                if (char === '/') {
+                    if (i > lastIndex) {
+                        parts.push({ type: 'text', value: content.substring(lastIndex, i), start: offset + lastIndex, end: offset + i });
+                    }
+                    parts.push({ type: 'slash', value: '/', start: offset + i, end: offset + i + 1 });
+                    lastIndex = i + 1;
+                }
+                // Case 2: Colon :
+                else if (char === ':') {
+                    if (i > lastIndex) {
+                        parts.push({ type: 'text', value: content.substring(lastIndex, i), start: offset + lastIndex, end: offset + i });
+                    }
+                    parts.push({ type: 'colon', value: ':', start: offset + i, end: offset + i + 1 });
+                    lastIndex = i + 1;
+                }
+                // Case 3: Start of a format tag [tag]
+                else if (char === '[' && (nextChar && nextChar.match(/[a-zA-Z\/]/))) {
+                    const endBracket = content.indexOf(']', i);
+                    if (endBracket !== -1) {
+                        if (i > lastIndex) {
+                            parts.push({ type: 'text', value: content.substring(lastIndex, i), start: offset + lastIndex, end: offset + i });
+                        }
+                        const tagContent = content.substring(i + 1, endBracket);
+                        const isClosing = tagContent.startsWith('/');
+                        const tagName = isClosing ? tagContent.substring(1) : tagContent.split(/[\s\]]/)[0];
+                        const attributes = {};
+                        if (!isClosing && tagContent.includes(' ')) {
+                            const attrString = tagContent.substring(tagName.length).trim();
+                            const attrMatches = attrString.matchAll(/(\w+)=['"]([^'"]*)['"]/g);
+                            for (const match of attrMatches) {
+                                attributes[match[1] || match[3]] = match[2] || match[4];
+                            }
+                        }
+                        parts.push({ type: 'formatTag', tagName: tagName, isClosing: isClosing, attributes: attributes, start: offset + i, end: offset + endBracket + 1 });
+                        lastIndex = endBracket + 1;
+                        i = endBracket;
+                    }
+                }
+            }
+            if (lastIndex < content.length) {
+                parts.push({ type: 'text', value: content.substring(lastIndex), start: offset + lastIndex, end: offset + content.length });
+            }
+            return parts;
+        }
+
+        function parseQuodlibet(content, offset = 0) {
+            const parts = [];
+            let lastIndex = 0;
+            let balance = 0;
+            let inNumericExpression = false;
+
+            for (let i = 0; i < content.length; i++) {
+                const char = content[i];
+                const prevChar = content[i - 1];
+
+                if (char === '#' && i + 1 < content.length && content[i+1] === '(') { inNumericExpression = true; }
+                if (char === ')') { inNumericExpression = false; }
+
+                if (char === '<' && prevChar !== '\\' && !inNumericExpression) {
+                    if (balance === 0) {
+                        if (i > lastIndex) {
+                            parts.push(...parseSubContent(content.substring(lastIndex, i), offset + lastIndex));
+                        }
+                        lastIndex = i;
+                    }
+                    balance++;
+                } else if (char === '>' && prevChar !== '\\' && !inNumericExpression) {
+                    balance--;
+                    if (balance === 0) {
+                        const tagContent = content.substring(lastIndex + 1, i);
+                        const expressions = parseExpressions(tagContent, offset + lastIndex + 1);
+                        parts.push({ type: 'tag', expressions: expressions, start: offset + lastIndex, end: offset + i + 1 });
+                        lastIndex = i + 1;
+                    }
+                }
+            }
+
+            if (lastIndex < content.length) {
+                parts.push(...parseSubContent(content.substring(lastIndex), offset + lastIndex));
+            }
+
+            return parts;
+        }
+
+
+        function render(parsedContent) {
+            const nodes = [];
+            parsedContent.forEach(part => {
+                if (part.type === 'text') {
+                    const span = document.createElement('span');
+                    span.classList.add('text');
+                    span.innerHTML = escapeHtml(part.value).replaceAll(' ', `<span class="space"></span>`);
+                    span.setAttribute('data-start-id', part.start);
+                    span.setAttribute('data-end-id', part.end);
+                    nodes.push(span);
+                } else if (part.type === 'slash') {
+                    const slashSpan = document.createElement('span');
+                    slashSpan.classList.add('slash');
+                    slashSpan.textContent = '/';
+                    slashSpan.setAttribute('data-start-id', part.start);
+                    slashSpan.setAttribute('data-end-id', part.end);
+                    nodes.push(slashSpan);
+                } else if (part.type === 'colon') {
+                    const colonSpan = document.createElement('span');
+                    colonSpan.classList.add('colon');
+                    colonSpan.textContent = ':';
+                    colonSpan.setAttribute('data-start-id', part.start);
+                    colonSpan.setAttribute('data-end-id', part.end);
+                    nodes.push(colonSpan);
+                } else if (part.type === 'tag') {
+                    const isSimpleTag = part.expressions.length === 1 && !part.expressions[0].value.includes('|') && !part.expressions[0].value.includes('||');
+
+                    if (isSimpleTag) {
+                        const tagValue = part.expressions[0].value;
+                        const element = document.createElement('span');
+                        element.classList.add('qltag');
+                        element.innerHTML = `&lt;${escapeHtml(tagValue)}&gt;`;
+                        element.setAttribute('data-start-id', part.start);
+                        element.setAttribute('data-end-id', part.end);
+                        nodes.push(element);
+                    } else if (part.expressions[0].isFallback) {
+                        const element = document.createElement('span');
+                        element.classList.add('wrapper', 'fallbackchain');
+                        element.setAttribute('data-start-id', part.start);
+                        element.setAttribute('data-end-id', part.end);
+
+                        part.expressions.forEach((expression) => {
+                            const alternateSpan = document.createElement('span');
+                            alternateSpan.classList.add('alternate');
+                            alternateSpan.setAttribute('data-start-id', expression.start);
+                            alternateSpan.setAttribute('data-end-id', expression.end);
+                            const innerNodes = render(parseQuodlibet(expression.value, expression.start));
+                            innerNodes.forEach(node => alternateSpan.appendChild(node));
+                            element.appendChild(alternateSpan);
+                        });
+                        nodes.push(element);
+                    } else {
+                        const element = document.createElement('span');
+                        element.classList.add('wrapper');
+                        element.setAttribute('data-start-id', part.start);
+                        element.setAttribute('data-end-id', part.end);
+                        const condition = part.expressions[0];
+                        const conditionSpan = document.createElement('span');
+                        conditionSpan.classList.add('condition');
+                        if (condition.value.includes('#(')) conditionSpan.classList.add('numeric');
+                        conditionSpan.innerHTML = highlightQuotedStrings(processNumericExpression(condition.value));
+                        conditionSpan.setAttribute('data-start-id', condition.start);
+                        conditionSpan.setAttribute('data-end-id', condition.end);
+                        element.appendChild(conditionSpan);
+
+                        const consequentWrapper = document.createElement('span');
+                        consequentWrapper.classList.add('consequent');
+
+                        for (let k = 1; k < part.expressions.length; k++) {
+                            const expression = part.expressions[k];
+                            const expressionSpan = document.createElement('span');
+                            expressionSpan.classList.add('expression');
+                            expressionSpan.classList.add(k === 1 ? 'ok' : 'ko');
+                            expressionSpan.setAttribute('data-start-id', expression.start);
+                            expressionSpan.setAttribute('data-end-id', expression.end);
+                            const innerNodes = render(parseQuodlibet(expression.value, expression.start));
+                            if (innerNodes.length === 1 && innerNodes[0].classList.contains('wrapper')) {
+                                const innerWrapper = innerNodes[0];
+                                while (innerWrapper.firstChild) {
+                                    expressionSpan.appendChild(innerWrapper.firstChild);
+                                }
+                            } else {
+                                innerNodes.forEach(node => expressionSpan.appendChild(node));
+                            }
+                            consequentWrapper.appendChild(expressionSpan);
+                        }
+                        element.appendChild(consequentWrapper);
+                        nodes.push(element);
+                    }
+                } else if (part.type === 'formatTag') {
+                    const element = document.createElement('span');
+                    element.classList.add(part.isClosing ? 'format-end' : 'format-start');
+                    element.setAttribute('data-start-id', part.start);
+                    element.setAttribute('data-end-id', part.end);
+
+                    let content = `[${part.isClosing ? '/' : ''}${part.tagName}`;
+                    if (Object.keys(part.attributes).length > 0) {
+                        for (const key in part.attributes) {
+                            content += ` ${key}="${part.attributes[key]}"`;
+                        }
+                    }
+                    content += ']';
+                    element.textContent = content;
+                    nodes.push(element);
+                }
+            });
+            return nodes;
+        }
+
+        function visualize() {
+            const inputString = document.getElementById('inputString').value;
+            const outputDiv = document.getElementById('output');
+
+            const parsedNodes = render(parseQuodlibet(inputString));
+            outputDiv.innerHTML = '';
+            parsedNodes.forEach(node => outputDiv.appendChild(node));
+
+            groupBase(outputDiv);
+        }
+
+        function groupBase(parentElement) {
+            const children = Array.from(parentElement.children);
+            let chunk = [];
+
+            const newChildren = [];
+            let i = 0;
+            while(i < children.length) {
+                const child = children[i];
+                if (child.classList.contains('qltag') || child.classList.contains('slash') || child.classList.contains('text') || child.classList.contains('format-start') || child.classList.contains('format-end') || child.classList.contains('colon')) {
+                    chunk.push(child);
+                } else {
+                    if (chunk.length > 0) {
+                        const wrapper = document.createElement('span');
+                        wrapper.classList.add('wrapper');
+                        wrapper.setAttribute('data-start-id', chunk[0].getAttribute('data-start-id'));
+                        wrapper.setAttribute('data-end-id', chunk[chunk.length - 1].getAttribute('data-end-id'));
+                        chunk.forEach(el => wrapper.appendChild(el));
+                        newChildren.push(wrapper);
+                        chunk = [];
+                    }
+                    newChildren.push(child);
+                }
+                i++;
+            }
+            if (chunk.length > 0) {
+                const wrapper = document.createElement('span');
+                wrapper.classList.add('wrapper');
+                wrapper.setAttribute('data-start-id', chunk[0].getAttribute('data-start-id'));
+                wrapper.setAttribute('data-end-id', chunk[chunk.length - 1].getAttribute('data-end-id'));
+                chunk.forEach(el => wrapper.appendChild(el));
+                newChildren.push(wrapper);
+            }
+
+            while(parentElement.firstChild) {
+                parentElement.removeChild(parentElement.firstChild);
+            }
+
+            newChildren.forEach(child => parentElement.appendChild(child));
+        }
+
+        function highlightOutputElement(element) {
+            const allSelected = document.querySelectorAll('#output .selection');
+            allSelected.forEach(el => el.classList.remove('selection'));
+            if (element && element.id !== 'output') {
+                element.classList.add('selection');
+            }
+        }
+
+        window.onload = function() {
+            visualize();
+
+            const inputElement = document.getElementById('inputString');
+            const outputDiv = document.getElementById('output');
+
+            outputDiv.addEventListener('click', (e) => {
+                const target = e.target.closest('[data-start-id]');
+                if (target) {
+                    highlightOutputElement(target);
+                    const start = parseInt(target.getAttribute('data-start-id'));
+                    const end = parseInt(target.getAttribute('data-end-id'));
+                    inputElement.focus();
+                    inputElement.setSelectionRange(start, end);
+
+                    const inputScrollHeight = inputElement.scrollHeight;
+                    const inputClientHeight = inputElement.clientHeight;
+                    const inputScrollTop = inputElement.scrollTop;
+                    const selectionStartPos = (start / inputElement.value.length) * inputScrollHeight;
+                    const selectionEndPos = (end / inputElement.value.length) * inputScrollHeight;
+
+                    if (selectionStartPos < inputScrollTop || selectionEndPos > inputScrollTop + inputClientHeight) {
+                        inputElement.scrollTop = selectionStartPos - (inputClientHeight / 2);
+                    }
+                } else {
+                    highlightOutputElement(null);
+                }
+            });
+
+            inputElement.addEventListener('mouseup', handleInputSelection);
+            inputElement.addEventListener('keyup', handleInputSelection);
+
+            function findCommonAncestor(elements) {
+                if (elements.length === 0) return null;
+                if (elements.length === 1) return elements[0];
+
+                let firstElement = elements[0];
+                let lastElement = elements[elements.length - 1];
+
+                let ancestors = new Set();
+                let current = firstElement;
+                while (current) {
+                    ancestors.add(current);
+                    current = current.parentElement;
+                }
+
+                current = lastElement;
+                while (current) {
+                    if (ancestors.has(current)) {
+                        return current;
+                    }
+                    current = current.parentElement;
+                }
+                return null;
+            }
+
+            function handleInputSelection() {
+                const start = inputElement.selectionStart;
+                const end = inputElement.selectionEnd;
+
+                if (start === end) {
+                    highlightOutputElement(null);
+                    return;
+                }
+
+                const outputElements = document.querySelectorAll('#output [data-start-id]');
+                const overlapping = Array.from(outputElements).filter(item => {
+                    const itemStart = parseInt(item.getAttribute('data-start-id'));
+                    const itemEnd = parseInt(item.getAttribute('data-end-id'));
+                    return (itemStart < end && itemEnd > start);
+                });
+
+                let bestMatch = null;
+                if (overlapping.length > 0) {
+                    for (const item of overlapping) {
+                        const itemStart = parseInt(item.getAttribute('data-start-id'));
+                        const itemEnd = parseInt(item.getAttribute('data-end-id'));
+                        if (itemStart <= start && itemEnd >= end) {
+                            if (!bestMatch || (itemEnd - itemStart) < (parseInt(bestMatch.getAttribute('data-end-id')) - parseInt(bestMatch.getAttribute('data-start-id')))) {
+                                bestMatch = item;
+                            }
+                        }
+                    }
+
+                    if (bestMatch) {
+                        highlightOutputElement(bestMatch);
+                        bestMatch.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                    } else {
+                        const elementsToHighlight = overlapping.map(item => item);
+                        const commonAncestor = findCommonAncestor(elementsToHighlight);
+                        if (commonAncestor) {
+                           highlightOutputElement(commonAncestor);
+                           commonAncestor.scrollIntoView({ behavior: 'smooth', block: 'center' });
+                        }
+                    }
+                } else {
+                    highlightOutputElement(null);
+                }
+            }
+
+            inputElement.addEventListener('input', () => {
+                clearTimeout(timeout);
+                timeout = setTimeout(visualize, 500);
+            });
+        };
+    </script>
+</body>
+</html>
