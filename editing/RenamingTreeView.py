@@ -27,6 +27,28 @@ def find_ancestor_by_class(widget, target_class):
     return None
 
 
+def _case_insensitive_sort(model, iter1, iter2, user_data):
+    """
+    Custom Gtk.TreeModel sort function for case-insensitive string comparison.
+    Sorts based on column 0 (the display name).
+    """
+    try:
+        val1 = model.get_value(iter1, 0)
+        val2 = model.get_value(iter2, 0)
+    except Exception:
+        return 0
+
+    s1 = (val1 or "").lower()
+    s2 = (val2 or "").lower()
+
+    if s1 < s2:
+        return -1
+    elif s1 > s2:
+        return 1
+    else:
+        return 0
+
+
 class RenamingTreeView(Gtk.Box, RenameFilesPlugin):
     PLUGIN_ID = "RenamingTreeView"
     PLUGIN_NAME = _("Renaming Tree View")
@@ -75,6 +97,10 @@ class RenamingTreeView(Gtk.Box, RenameFilesPlugin):
             original_sw, "icon-name", "view-list-symbolic")
 
         self.fs_tstore = Gtk.TreeStore(str, str, object)
+
+        self.fs_tstore.set_sort_func(0, _case_insensitive_sort, None)
+        self.fs_tstore.set_sort_column_id(0, Gtk.SortType.ASCENDING)
+
         self.fs_view = Gtk.TreeView(model=self.fs_tstore)
         self.fs_view.set_headers_visible(False)
         self.fs_view.set_has_tooltip(True)
@@ -114,7 +140,10 @@ class RenamingTreeView(Gtk.Box, RenameFilesPlugin):
             entry = row[0]
             self.__add_to_fs_tree(entry, folder_iters)
 
-        self.fs_view.expand_all()
+        if len(list_model) <= 50:
+            self.fs_view.expand_all()
+        else:
+            self.fs_tstore.foreach(self._selectively_expand)
 
     def _on_fs_view_query_tooltip(self, widget, x, y, keyboard_tip, tooltip):
         path_info = widget.get_path_at_pos(x, y)
@@ -125,6 +154,31 @@ class RenamingTreeView(Gtk.Box, RenameFilesPlugin):
         if entry:
             tooltip.set_text(entry.name)
             return True
+        return False
+
+    def _selectively_expand(self, model, path, iter):
+        """
+        Gtk.TreeStore.foreach() callback.
+        Expands a row (iter) if it's a folder that contains other folders.
+        Does not expand "leaf" directories (folders containing only files).
+        """
+        entry = model.get_value(iter, 2)
+        if entry is not None:
+            return False
+
+        child_iter = model.iter_children(iter)
+        is_parent_of_folder = False
+
+        while child_iter:
+            is_child_a_folder = model.get_value(child_iter, 2) is None
+            if is_child_a_folder:
+                is_parent_of_folder = True
+                break
+            child_iter = model.iter_next(child_iter)
+
+        if is_parent_of_folder:
+            self.fs_view.expand_row(path, open_all=False)
+
         return False
 
     def __add_fs_tree_columns(self):
