@@ -62,8 +62,9 @@ class Config:
     seek_amount = IntConfProp(_config, "seek_amount", 5000)
     max_data_points = IntConfProp(_config, "max_data_points", 3000)
     show_time_labels = BoolConfProp(_config, "show_time_labels", True)
-    half_waveform = BoolConfProp(_config, "half_waveform", False)
+    half_waveform = BoolConfProp(_config, "half_waveform", True)
     compression_factor = FloatConfProp(_config, "compression_factor", 3.0)
+    scroll_controls_compression = BoolConfProp(_config, "scroll_controls_compression", True)
     height_px = IntConfProp(_config, "height_px", 40)
 
 
@@ -647,12 +648,36 @@ class WaveformScale(Gtk.EventBox):
         return None
 
     def do_scroll_event(self, event):
-        if event.direction == Gdk.ScrollDirection.UP:
-            self._player.seek(self._player.get_position() + CONFIG.seek_amount)
-            self.queue_draw()
-        elif event.direction == Gdk.ScrollDirection.DOWN:
-            self._player.seek(self._player.get_position() - CONFIG.seek_amount)
-            self.queue_draw()
+        if CONFIG.scroll_controls_compression:
+            if event.direction == Gdk.ScrollDirection.UP:
+                new_factor = round(CONFIG.compression_factor + 0.1, 1)
+                CONFIG.compression_factor = min(new_factor, 10.0)
+                self.queue_draw()
+                return True
+            elif event.direction == Gdk.ScrollDirection.DOWN:
+                new_factor = round(CONFIG.compression_factor - 0.1, 1)
+                CONFIG.compression_factor = max(1.0, new_factor)
+                self.queue_draw()
+                return True
+            elif event.direction == Gdk.ScrollDirection.RIGHT:
+                self._player.seek(self._player.get_position() + CONFIG.seek_amount)
+                self.queue_draw()
+                return True
+            elif event.direction == Gdk.ScrollDirection.LEFT:
+                self._player.seek(self._player.get_position() - CONFIG.seek_amount)
+                self.queue_draw()
+                return True
+        else:
+            if event.direction == Gdk.ScrollDirection.UP:
+                self._player.seek(self._player.get_position() + CONFIG.seek_amount)
+                self.queue_draw()
+                return True
+            elif event.direction == Gdk.ScrollDirection.DOWN:
+                self._player.seek(self._player.get_position() - CONFIG.seek_amount)
+                self.queue_draw()
+                return True
+
+        return False
 
     def set_position(self, position):
         self.position = position
@@ -727,6 +752,9 @@ class WaveformSeekBarPlugin2(EventPlugin):
             CONFIG.compression_factor = value
             if self._bar is not None:
                 self._bar._waveform_scale.queue_draw()
+
+        def on_scroll_controls_compression_toggled(button, *args):
+            CONFIG.scroll_controls_compression = button.get_active()
 
         def create_color(label_text, config_item):
             hbox = Gtk.HBox(spacing=6)
@@ -826,6 +854,15 @@ class WaveformSeekBarPlugin2(EventPlugin):
         compression_spin.set_numeric(True)
         compression_spin.connect("changed", on_compression_factor_changed)
         hbox.pack_end(compression_spin, False, True, 0)
+        vbox.pack_start(hbox, True, True, 0)
+
+        sw = Gtk.Switch()
+        label = Gtk.Label(_("Scroll control (Up/Down: compression, Left/Right: seek)"))
+        sw.set_active(CONFIG.scroll_controls_compression)
+        sw.connect("notify::active", on_scroll_controls_compression_toggled)
+        hbox = Gtk.HBox(spacing=6)
+        hbox.pack_start(label, False, True, 0)
+        hbox.pack_end(sw, False, True, 0)
         vbox.pack_start(hbox, True, True, 0)
 
         hbox = Gtk.HBox(spacing=6)
