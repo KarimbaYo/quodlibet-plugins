@@ -159,13 +159,62 @@
         .condition {
             color: #FC0;
             background: none;
-            margin: 0 10px 0 5px;
+            margin: 0 5px;
             border-radius: 6px;
             white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            flex-wrap: nowrap;
+            padding: 0;
+            border: 1px solid #FC0;
         }
         .condition:after {
             content: " ?";
             opacity:0.6;
+            margin-left: 4px;
+        }
+
+         .condition {
+            padding: 2px 4px;
+        }
+
+        .conjunction,
+        .disjunction {
+            position:relative;
+            display: flex;
+        }
+
+        .condition-operator {
+            font-weight: bold;
+            font-family: monospace;
+            margin-right:4px;
+        }
+        .conjunction .condition-operator { color: #0F8; }
+        .disjunction .condition-operator { color: #0AF; }
+
+        .conditionparts {
+            display: flex;
+            flex-direction: column;
+            align-items: start;
+            border-radius: 10px;
+            padding: 5px;
+        }
+        .conjunction .conditionparts {
+            border-left :2px solid #0F8;
+            border-right:2px solid #0F8;
+        }
+        .disjunction .conditionparts {
+            border-left :2px solid #0AF;
+            border-right:2px solid #0AF;
+        }
+
+        .conditionpart {
+            padding: 1px 4px;
+            margin: 1px 2px;
+            border-radius: 3px;
+            border: 1px solid #777;
+            font-family: monospace;
+            color: #FC0;
         }
 
         .numeric {
@@ -203,12 +252,11 @@
         .consequent {
             display: flex;
             flex-direction: column;
-            position: relative;
+            /* position: relative; */
             gap: 4px;
             padding: 4px;
         }
 
-        /* New styles for fallback chain */
         .fallbackchain {
             border: 2px solid #F70;
             flex-direction: column;
@@ -226,7 +274,6 @@
             border-bottom:none;
         }
 
-        /* New styles for XHTML-like tags */
         .format-start,
         .format-end {
             color: #0CF;
@@ -267,7 +314,7 @@
 
     <div class="container">
         <div class="controls">
-            <textarea id="inputString">/Music/<genre|<genre>|Unclassified>/<<composer>||<albumartist>||<artist>>/<year> - <album>/<discnumber|CD <discnumber>/><tracknumber>. <title>.mp3</textarea>
+            <textarea id="inputString">/Music/<genre|<genre>|Unclassified>/<&(albumartist,composer)|Various Artists|<artist>>/<year> - <\|(album="Divers",album="",compilation=1)|Divers|<album>>/<discnumber|CD <discnumber>/><tracknumber>. <title>.mp3</textarea>
         </div>
         <div class="output-container">
             <div id="output"></div>
@@ -305,9 +352,48 @@
         function parseExpressions(tagContent, offset) {
             const expressions = [];
             let subBalance = 0;
+            let parenBalance = 0;
             let lastSplit = 0;
             let inNumericExpression = false;
-            let isFallback = tagContent.includes('||');
+            let isFallback = false;
+
+            let tempSubBalance = 0;
+            let tempParenBalance = 0;
+            let tempInNumeric = false;
+            let hasFallback = false;
+            for (let j = 0; j < tagContent.length; j++) {
+                const subChar = tagContent[j];
+                const prevSubChar = tagContent[j - 1];
+                const nextSubChar = tagContent[j + 1];
+
+                if (subChar === '<' && prevSubChar !== '\\' && !tempInNumeric) tempSubBalance++;
+                else if (subChar === '>' && prevSubChar !== '\\' && !tempInNumeric) tempSubBalance--;
+                else if (subChar === '[' && prevSubChar !== '\\' && (nextSubChar && nextSubChar.match(/[a-zA-Z\/]/)) && !tempInNumeric) tempSubBalance++;
+                else if (subChar === ']' && prevSubChar !== '\\' && !tempInNumeric) tempSubBalance--;
+
+                if (subChar === '#' && j + 1 < tagContent.length && tagContent[j+1] === '(') { tempInNumeric = true; }
+                else if (subChar === '(' && prevSubChar !== '\\' && !tempInNumeric) { tempParenBalance++; } // Ajouté
+
+                else if (subChar === ')' && prevSubChar !== '\\') { // Ajouté: check échappement
+                    if (tempInNumeric) {
+                        tempInNumeric = false;
+                    } else if (tempParenBalance > 0) {
+                        tempParenBalance--;
+                    }
+                }
+
+                if (tempSubBalance === 0 && tempParenBalance === 0 && !tempInNumeric) {
+                    if (j + 1 < tagContent.length && tagContent.substring(j, j + 2) === '||' && prevSubChar !== '\\') {
+                        hasFallback = true;
+                        break;
+                    }
+                }
+            }
+            isFallback = hasFallback;
+
+            subBalance = 0;
+            parenBalance = 0;
+            inNumericExpression = false;
 
             for (let j = 0; j < tagContent.length; j++) {
                 const subChar = tagContent[j];
@@ -320,14 +406,22 @@
                 else if (subChar === ']' && prevSubChar !== '\\' && !inNumericExpression) subBalance--;
 
                 if (subChar === '#' && j + 1 < tagContent.length && tagContent[j+1] === '(') { inNumericExpression = true; }
-                if (subChar === ')') { inNumericExpression = false; }
+                else if (subChar === '(' && prevSubChar !== '\\' && !inNumericExpression) { parenBalance++; } // Ajouté
 
-                if (subBalance === 0 && !inNumericExpression) {
-                    if (isFallback && j + 1 < tagContent.length && tagContent.substring(j, j + 2) === '||') {
+                else if (subChar === ')' && prevSubChar !== '\\') { // Ajouté: check échappement
+                    if (inNumericExpression) {
+                        inNumericExpression = false;
+                    } else if (parenBalance > 0) {
+                        parenBalance--;
+                    }
+                }
+
+                if (subBalance === 0 && parenBalance === 0 && !inNumericExpression) {
+                    if (isFallback && j + 1 < tagContent.length && tagContent.substring(j, j + 2) === '||' && prevSubChar !== '\\') {
                          expressions.push({ type: 'expression', value: tagContent.substring(lastSplit, j), start: offset + lastSplit, end: offset + j, delimiterStart: offset + j, delimiterEnd: offset + j + 2, isFallback: true });
                          lastSplit = j + 2;
                          j++;
-                    } else if (!isFallback && subChar === '|') {
+                    } else if (!isFallback && subChar === '|' && prevSubChar !== '\\') { // MODIFIÉ: Ajout de prevSubChar check
                         expressions.push({ type: 'expression', value: tagContent.substring(lastSplit, j), start: offset + lastSplit, end: offset + j, delimiterStart: offset + j, delimiterEnd: offset + j + 1, isFallback: false });
                         lastSplit = j + 1;
                     }
@@ -344,7 +438,6 @@
                 const char = content[i];
                 const nextChar = content[i+1];
 
-                // Case 1: Path slash /
                 if (char === '/') {
                     if (i > lastIndex) {
                         parts.push({ type: 'text', value: content.substring(lastIndex, i), start: offset + lastIndex, end: offset + i });
@@ -352,7 +445,6 @@
                     parts.push({ type: 'slash', value: '/', start: offset + i, end: offset + i + 1 });
                     lastIndex = i + 1;
                 }
-                // Case 2: Colon :
                 else if (char === ':') {
                     if (i > lastIndex) {
                         parts.push({ type: 'text', value: content.substring(lastIndex, i), start: offset + lastIndex, end: offset + i });
@@ -360,7 +452,6 @@
                     parts.push({ type: 'colon', value: ':', start: offset + i, end: offset + i + 1 });
                     lastIndex = i + 1;
                 }
-                // Case 3: Start of a format tag [tag]
                 else if (char === '[' && (nextChar && nextChar.match(/[a-zA-Z\/]/))) {
                     const endBracket = content.indexOf(']', i);
                     if (endBracket !== -1) {
@@ -401,7 +492,11 @@
                 const prevChar = content[i - 1];
 
                 if (char === '#' && i + 1 < content.length && content[i+1] === '(') { inNumericExpression = true; }
-                if (char === ')') { inNumericExpression = false; }
+                else if (char === ')' && prevChar !== '\\') {
+                    if (inNumericExpression) {
+                        inNumericExpression = false;
+                    }
+                }
 
                 if (char === '<' && prevChar !== '\\' && !inNumericExpression) {
                     if (balance === 0) {
@@ -430,13 +525,111 @@
         }
 
 
+        function splitConditions(content, offset) {
+            const parts = [];
+            let lastSplit = 0;
+            let subBalance = 0;
+            let parenBalance = 0;
+            let inNumericExpression = false;
+            let inQuote = false;
+            let quoteChar = '';
+
+            for (let j = 0; j < content.length; j++) {
+                const char = content[j];
+                const prevChar = content[j - 1];
+                const nextChar = content[j + 1];
+
+                if (!inQuote) {
+                    if (char === '<' && prevChar !== '\\' && !inNumericExpression) subBalance++;
+                    else if (char === '>' && prevChar !== '\\' && !inNumericExpression) subBalance--;
+                    else if (char === '[' && prevChar !== '\\' && (nextChar && nextChar.match(/[a-zA-Z\/]/)) && !inNumericExpression) subBalance++;
+                    else if (char === ']' && prevChar !== '\\' && !inNumericExpression) subBalance--;
+                    else if (char === '#' && j + 1 < content.length && content[j+1] === '(') { inNumericExpression = true; }
+                    else if (char === '(' && prevChar !== '\\' && !inNumericExpression) { parenBalance++; }
+                    else if (char === ')' && prevChar !== '\\') {
+                        if (inNumericExpression) inNumericExpression = false;
+                        else if (parenBalance > 0) parenBalance--;
+                    }
+                    else if ((char === '"' || char === "'") && prevChar !== '\\') {
+                        inQuote = true;
+                        quoteChar = char;
+                    }
+                } else {
+                    if (char === quoteChar && prevChar !== '\\') {
+                        inQuote = false;
+                    }
+                }
+
+                if (char === ',' && prevChar !== '\\' && !inQuote && subBalance === 0 && parenBalance === 0 && !inNumericExpression) {
+                    parts.push({ value: content.substring(lastSplit, j), start: offset + lastSplit, end: offset + j });
+                    lastSplit = j + 1;
+                }
+            }
+            parts.push({ value: content.substring(lastSplit), start: offset + lastSplit, end: offset + content.length });
+            return parts;
+        }
+
+        function renderCondition(condition, conditionSpan) {
+            const conditionValue = condition.value;
+            const conditionStart = condition.start;
+
+            let type = null;
+            let operatorText = '';
+            let contentOffset = 0;
+
+            if (conditionValue.startsWith('&(') && conditionValue.endsWith(')')) {
+                type = 'conjunction';
+                operatorText = '&';
+                contentOffset = 2;
+            } else if (conditionValue.startsWith('\\|(') && conditionValue.endsWith(')')) {
+                type = 'disjunction';
+                operatorText = '|';
+                contentOffset = 3;
+            }
+
+            if (type) {
+                conditionSpan.classList.add(type);
+
+                const operatorSpan = document.createElement('span');
+                operatorSpan.className = 'condition-operator';
+                operatorSpan.textContent = operatorText;
+                conditionSpan.appendChild(operatorSpan);
+
+                const partsWrapper = document.createElement('span');
+                partsWrapper.className = 'conditionparts';
+                conditionSpan.appendChild(partsWrapper);
+
+                const innerContent = conditionValue.substring(contentOffset, conditionValue.length - 1);
+                const innerOffset = conditionStart + contentOffset;
+                const subConditions = splitConditions(innerContent, innerOffset);
+
+                subConditions.forEach((sub, index) => {
+                    const subSpan = document.createElement('span');
+                    subSpan.className = 'conditionpart';
+                    subSpan.setAttribute('data-start-id', sub.start);
+                    subSpan.setAttribute('data-end-id', sub.end);
+
+                    subSpan.innerHTML = highlightQuotedStrings(processNumericExpression(sub.value));
+                    if (sub.value.includes('#(')) subSpan.classList.add('numeric');
+
+                    partsWrapper.appendChild(subSpan);
+                });
+
+            } else {
+                if (condition.value.includes('#(')) conditionSpan.classList.add('numeric');
+                conditionSpan.innerHTML = highlightQuotedStrings(processNumericExpression(condition.value));
+            }
+        }
+
+
         function render(parsedContent) {
             const nodes = [];
             parsedContent.forEach(part => {
                 if (part.type === 'text') {
                     const span = document.createElement('span');
                     span.classList.add('text');
-                    span.innerHTML = escapeHtml(part.value).replaceAll(' ', `<span class="space"></span>`);
+                    const displayValue = escapeHtml(part.value).replace(/\\\|/g, '|');
+                    span.innerHTML = displayValue.replaceAll(' ', `<span class="space"></span>`);
                     span.setAttribute('data-start-id', part.start);
                     span.setAttribute('data-end-id', part.end);
                     nodes.push(span);
@@ -487,12 +680,12 @@
                         element.setAttribute('data-start-id', part.start);
                         element.setAttribute('data-end-id', part.end);
                         const condition = part.expressions[0];
+
                         const conditionSpan = document.createElement('span');
                         conditionSpan.classList.add('condition');
-                        if (condition.value.includes('#(')) conditionSpan.classList.add('numeric');
-                        conditionSpan.innerHTML = highlightQuotedStrings(processNumericExpression(condition.value));
                         conditionSpan.setAttribute('data-start-id', condition.start);
                         conditionSpan.setAttribute('data-end-id', condition.end);
+                        renderCondition(condition, conditionSpan);
                         element.appendChild(conditionSpan);
 
                         const consequentWrapper = document.createElement('span');
@@ -506,14 +699,9 @@
                             expressionSpan.setAttribute('data-start-id', expression.start);
                             expressionSpan.setAttribute('data-end-id', expression.end);
                             const innerNodes = render(parseQuodlibet(expression.value, expression.start));
-                            if (innerNodes.length === 1 && innerNodes[0].classList.contains('wrapper')) {
-                                const innerWrapper = innerNodes[0];
-                                while (innerWrapper.firstChild) {
-                                    expressionSpan.appendChild(innerWrapper.firstChild);
-                                }
-                            } else {
-                                innerNodes.forEach(node => expressionSpan.appendChild(node));
-                            }
+
+                            innerNodes.forEach(node => expressionSpan.appendChild(node));
+
                             consequentWrapper.appendChild(expressionSpan);
                         }
                         element.appendChild(consequentWrapper);
