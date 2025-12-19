@@ -21,10 +21,20 @@ def conjunction_plugin_get_selected_songs(pane, sort=False):
 	"""Modified method of __get_selected_songs"""
 	model, paths = pane.get_selection().get_selected_rows()
 
-	if (plugin_config.get("state") == "&"):
+	# Determine if the current pane is the last column in the browser.
+	is_last_pane = False
+	try:
+		if hasattr(app.browser, "_panes") and app.browser._panes:
+			if pane is app.browser._panes[-1]:
+				is_last_pane = True
+	except Exception:
+		pass
+
+	if (plugin_config.get("state") == "&") and not is_last_pane:
 		songs = model.get_songs_conjunction(paths)
 	else:
 		songs = model.get_songs(paths)
+
 	if sort:
 		return sorted(songs, key=operator.attrgetter("sort_key"))
 	return songs
