@@ -22,6 +22,15 @@ An improved version of the original **WaveformSeekbar** plugin, with two additio
 
 ![WaveformSeekbar2 Plugin](screenshots/events-waveformseekbar2.png)
 
+#### FadeOut
+
+The **Fade-out** plugin allows you to stop your music smoothly by gradually lowering the volume instead of an abrupt cut.
+
+**Main Features:**
+- Full Control: Customize the fade duration (up to 30s) and choose the final action (Pause, Stop, or Quit).
+- Smart Shortcut: Use the built-in recorder to set your preferred key combination (default: Ctrl+Shift+F).
+- Clean Integration: Adds a dedicated "Stop with fade-out" entry directly into the Control menu.
+
 ### /editing/
 
 #### RenamingTreeView
