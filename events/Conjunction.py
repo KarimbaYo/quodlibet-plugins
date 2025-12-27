@@ -1,3 +1,10 @@
+# Copyright 2025 Yoann GUERIN
+#
+# This program is free software; you can redistribute it and/or modify
+# it under the terms of the GNU General Public License as published by
+# the Free Software Foundation; either version 2 of the License, or
+# (at your option) any later version.
+
 import operator
 
 from gi.repository import Gtk, GdkPixbuf, Gio
@@ -6,96 +13,108 @@ from quodlibet import _
 from quodlibet import app
 from quodlibet.plugins import PluginConfig
 from quodlibet.plugins.events import EventPlugin
-from quodlibet.browsers.paned.main import PanedBrowser
 from quodlibet.browsers.paned.pane import Pane
 from quodlibet.browsers.paned.models import PaneModel, AllEntry
 from quodlibet.qltk import Icons, print_d
 
-ICON_AND = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-	<path fill="currentColor" d="M15.7,4.5c-1.1,0-2.2,0.3-3.2,0.7c-0.1,0.1-0.3,0.1-0.4,0.1s-0.3,0-0.4-0.1c-1-0.5-2.1-0.7-3.2-0.7C4.4,4.5,1,7.9,1,12
-	s3.4,7.5,7.5,7.5c1.1,0,2.2-0.3,3.2-0.7c0.1-0.1,0.3-0.1,0.4-0.1s0.3,0,0.4,0.1c1,0.5,2.1,0.7,3.2,0.7c4.1,0,7.5-3.4,7.5-7.5
-	S19.8,4.5,15.7,4.5z M12.6,16.6c-0.2,0.1-0.4,0.2-0.6,0.2s-0.4-0.1-0.6-0.2c-1.6-1.3-2.6-2.9-2.6-4.6s0.9-3.3,2.6-4.6
-	c0.2-0.1,0.4-0.2,0.6-0.2s0.4,0.1,0.6,0.2c1.6,1.3,2.6,2.9,2.6,4.6C15.2,13.7,14.3,15.3,12.6,16.6z"/>
-</svg>
-"""
+# AND: Intersection style
+ICON_AND = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    '<path fill="currentColor" d="M15.7,4.5c-1.1,0-2.2,0.3-3.2,0.7c-0.1,0.1-'
+    '0.3,0.1-0.4,0.1s-0.3,0-0.4-0.1c-1-0.5-2.1-0.7-3.2-0.7C4.4,4.5,1,7.9,1,'
+    '12s3.4,7.5,7.5,7.5c1.1,0,2.2-0.3,3.2-0.7c0.1-0.1,0.3-0.1,0.4-0.1s0.3,0,'
+    '0.4,0.1c1,0.5,2.1,0.7,3.2,0.7c4.1,0,7.5-3.4,7.5-7.5S19.8,4.5,15.7,4.5z '
+    'M12.6,16.6c-0.2,0.1-0.4,0.2-0.6,0.2s-0.4-0.1-0.6-0.2c-1.6-1.3-2.6-2.9-'
+    '2.6-4.6s0.9-3.3,2.6-4.6c0.2-0.1,0.4-0.2,0.6-0.2s0.4,0.1,0.6,0.2c1.6,1.3,'
+    '2.6,2.9,2.6,4.6C15.2,13.7,14.3,15.3,12.6,16.6z"/>'
+    '</svg>'
+)
 
-ICON_OR = """
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
-	<path fill="currentColor" d="M15.7,4.5c-1.1,0-2.2,0.3-3.2,0.7c-0.1,0.1-0.3,0.1-0.4,0.1s-0.3,0-0.4-0.1c-1-0.5-2.1-0.7-3.2-0.7c-4.1,0-7.5,3.4-7.5,7.5
-	s3.4,7.5,7.5,7.5c1.1,0,2.2-0.3,3.2-0.7c0.1-0.1,0.3-0.1,0.4-0.1s0.3,0,0.4,0.1c1,0.5,2.1,0.7,3.2,0.7c4.1,0,7.5-3.4,7.5-7.5
-	S19.8,4.5,15.7,4.5z M9.3,16.3c0.2,0.2,0.2,0.5,0.1,0.7s-0.3,0.4-0.6,0.4c-0.2,0-0.4,0-0.6,0c-3,0-5.5-2.5-5.5-5.5
-	c0-3,2.5-5.5,5.5-5.5c0.2,0,0.4,0,0.6,0c0.3,0,0.5,0.2,0.6,0.4c0.1,0.2,0.1,0.5-0.1,0.7C8.3,9,7.8,10.5,7.8,12
-	C7.8,13.5,8.3,15,9.3,16.3z M12.7,15.8c-0.2,0.2-0.5,0.3-0.7,0.3s-0.5-0.1-0.7-0.3c-1.1-1.1-1.7-2.4-1.7-3.8c0-1.4,0.6-2.7,1.7-3.8
-	C11.5,8,11.7,7.9,12,7.9s0.5,0.1,0.7,0.3c1.1,1.1,1.7,2.4,1.7,3.8C14.4,13.4,13.8,14.7,12.7,15.8z M15.7,17.5c-0.2,0-0.4,0-0.6,0
-	c-0.3,0-0.5-0.2-0.6-0.4s-0.1-0.5,0.1-0.7c1-1.3,1.5-2.8,1.5-4.3c0-1.5-0.5-3-1.5-4.3c-0.2-0.2-0.2-0.5-0.1-0.7
-	c0.1-0.2,0.3-0.4,0.6-0.4c0.2,0,0.4,0,0.6,0c3,0,5.5,2.5,5.5,5.5C21.2,15,18.7,17.5,15.7,17.5z"/>
-</svg>
-"""
+# OR: Union style
+ICON_OR = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">'
+    '<path fill="currentColor" d="M15.7,4.5c-1.1,0-2.2,0.3-3.2,0.7c-0.1,0.1-'
+    '0.3,0.1-0.4,0.1s-0.3,0-0.4-0.1c-1-0.5-2.1-0.7-3.2-0.7c-4.1,0-7.5,3.4-'
+    '7.5,7.5s3.4,7.5,7.5,7.5c1.1,0,2.2-0.3,3.2-0.7c0.1-0.1,0.3-0.1,0.4-0.1'
+    's0.3,0,0.4,0.1c1,0.5,2.1,0.7,3.2,0.7c4.1,0,7.5-3.4,7.5-7.5S19.8,4.5,'
+    '15.7,4.5z M9.3,16.3c0.2,0.2,0.2,0.5,0.1,0.7s-0.3,0.4-0.6,0.4c-0.2,0-'
+    '0.4,0-0.6,0c-3,0-5.5-2.5-5.5-5.5c0-3,2.5-5.5,5.5-5.5c0.2,0,0.4,0,0.6,'
+    '0c0.3,0,0.5,0.2,0.6,0.4c0.1,0.2,0.1,0.5-0.1,0.7C8.3,9,7.8,10.5,7.8,12'
+    'C7.8,13.5,8.3,15,9.3,16.3z M12.7,15.8c-0.2,0.2-0.5,0.3-0.7,0.3s-0.5-'
+    '0.1-0.7-0.3c-1.1-1.1-1.7-2.4-1.7-3.8c0-1.4,0.6-2.7,1.7-3.8C11.5,8,11.7,'
+    '7.9,12,7.9s0.5,0.1,0.7,0.3c1.1,1.1,1.7,2.4,1.7,3.8C14.4,13.4,13.8,14.7,'
+    '12.7,15.8z M15.7,17.5c-0.2,0-0.4,0-0.6,0c-0.3,0-0.5-0.2-0.6-0.4s-0.1-'
+    '0.5,0.1-0.7c1-1.3,1.5-2.8,1.5-4.3c0-1.5-0.5-3-1.5-4.3c-0.2-0.2-0.2-0.5-'
+    '0.1-0.7c0.1-0.2,0.3-0.4,0.6-0.4c0.2,0,0.4,0,0.6,0c3,0,5.5,2.5,5.5,5.5'
+    'C21.2,15,18.7,17.5,15.7,17.5z"/>'
+    '</svg>'
+)
 
 plugin_config = PluginConfig("conjunction")
 defaults = plugin_config.defaults
 defaults.set("state", "||")
 
+
 def get_pixbuf_from_svg(svg_str, size=24):
-	"""Converts an SVG string to a GdkPixbuf"""
-	try:
-		input_stream = Gio.MemoryInputStream.new_from_data(svg_str.encode("utf-8"), None)
-		return GdkPixbuf.Pixbuf.new_from_stream_at_scale(input_stream, size, size, True, None)
-	except Exception as e:
-		print_d(f"Conjunction Plugin: Error parsing SVG: {e}")
-		return None
+    """Converts an SVG string to a GdkPixbuf"""
+    try:
+        input_stream = Gio.MemoryInputStream.new_from_data(svg_str.encode("utf-8"), None)
+        return GdkPixbuf.Pixbuf.new_from_stream_at_scale(input_stream, size, size, True, None)
+    except Exception as e:
+        print_d(f"Conjunction Plugin: Error parsing SVG: {e}")
+        return None
+
 
 class ConjunctionButton(Gtk.ToggleButton):
-	"""A specific ToggleButton that handles its own SVG icons and states"""
+    """A specific ToggleButton that handles its own SVG icons and states"""
 
-	def __init__(self, initial_state_is_and):
-		super().__init__()
+    def __init__(self, initial_state_is_and):
+        super().__init__()
 
-		style_context = self.get_style_context()
-		style_context.add_class("conjunction-switch")
+        style_context = self.get_style_context()
+        style_context.add_class("conjunction-switch")
 
-		css = """
-		.conjunction-switch:checked {
-			background-color: transparent;
-		}
-		.conjunction-switch:hover {
-			background-color: @theme_selected_bg_color;
-			color: @theme_selected_fg_color;
-		}
-		"""
-		provider = Gtk.CssProvider()
-		provider.load_from_data(css.encode("utf-8"))
-		style_context.add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
+        css = """
+        .conjunction-switch:checked {
+            background-color: transparent;
+        }
+        .conjunction-switch:hover {
+            background-color: @theme_selected_bg_color;
+            color: @theme_selected_fg_color;
+        }
+        """
+        provider = Gtk.CssProvider()
+        provider.load_from_data(css.encode("utf-8"))
+        style_context.add_provider(provider, Gtk.STYLE_PROVIDER_PRIORITY_APPLICATION)
 
-		self.pixbuf_and = get_pixbuf_from_svg(ICON_AND)
-		self.pixbuf_or = get_pixbuf_from_svg(ICON_OR)
+        self.pixbuf_and = get_pixbuf_from_svg(ICON_AND)
+        self.pixbuf_or = get_pixbuf_from_svg(ICON_OR)
 
-		self.set_tooltip_text(_("Toggle conjunction mode for multi-selections"))
-		self.set_always_show_image(True)
+        self.set_tooltip_text(_("Toggle conjunction mode for multi-selections"))
+        self.set_always_show_image(True)
 
-		self.set_active(initial_state_is_and)
-		self.update_icon()
+        self.set_active(initial_state_is_and)
+        self.update_icon()
 
-		self.connect("toggled", self._on_internal_toggle)
+        self.connect("toggled", self._on_internal_toggle)
 
-	def _on_internal_toggle(self, widget):
-		self.update_icon()
+    def _on_internal_toggle(self, widget):
+        self.update_icon()
 
-	def update_icon(self):
-		is_and = self.get_active()
-		pixbuf = self.pixbuf_and if is_and else self.pixbuf_or
+    def update_icon(self):
+        is_and = self.get_active()
+        pixbuf = self.pixbuf_and if is_and else self.pixbuf_or
 
-		if pixbuf:
-			self.set_image(Gtk.Image.new_from_pixbuf(pixbuf))
-		else:
-			self.set_label("&" if is_and else "||")
+        if pixbuf:
+            self.set_image(Gtk.Image.new_from_pixbuf(pixbuf))
+        else:
+            self.set_label("&" if is_and else "||")
+
 
 def conjunction_plugin_get_selected_songs(pane, sort=False):
     """Modified method of __get_selected_songs"""
     model, paths = pane.get_selection().get_selected_rows()
 
-    # Determine if the current pane is the last column in the browser.
     is_last_pane = False
     try:
         if hasattr(app.browser, "_panes") and app.browser._panes:
@@ -115,6 +134,7 @@ def conjunction_plugin_get_selected_songs(pane, sort=False):
     if sort:
         return sorted(songs, key=operator.attrgetter("sort_key"))
     return songs
+
 
 def conjunction_plugin_get_songs(model, paths):
     """Get all songs for the given paths with conjunction"""
@@ -141,12 +161,18 @@ def conjunction_plugin_get_songs(model, paths):
 
     return s
 
+
 class Conjunction(EventPlugin):
     PLUGIN_ID = 'conjunction'
-    PLUGIN_NAME = "Conjonction"
-    PLUGIN_DESC = "Filters paned browser multi-selections using conjunction (logical AND)."
-    PLUGIN_ICON = Icons.EDIT
-    PLUGIN_VERSION = "0.5"
+    PLUGIN_NAME = _("Conjonction")
+
+    PLUGIN_DESC = _(
+        "Filters paned browser multi-selections using "
+        "conjunction or disjunction."
+    )
+
+    PLUGIN_ICON = Icons.SYSTEM_SEARCH
+    PLUGIN_VERSION = "0.7"
 
     def enabled(self):
         # Monkey-patching
@@ -178,6 +204,53 @@ class Conjunction(EventPlugin):
             del PaneModel.get_songs_conjunction
 
     def _on_button_toggled(self, button):
-        """Handle the state change and save config"""
+        """Handle the state change and refresh the browser view"""
         new_state = "&" if button.get_active() else "||"
         plugin_config.set("state", new_state)
+
+        try:
+            if hasattr(app.browser, "_panes") and app.browser._panes:
+                first_pane = app.browser._panes[0]
+                if hasattr(first_pane, "_Pane__selection_changed"):
+                    first_pane._Pane__selection_changed()
+        except Exception as e:
+            print_d(f"Conjunction Plugin: Error refreshing view: {e}")
+
+    @classmethod
+    def PluginPreferences(cls, parent):
+        """
+        Displays mode descriptions in the preferences window.
+        """
+        vbox = Gtk.VBox(spacing=10)
+
+        pixbuf_and = get_pixbuf_from_svg(ICON_AND)
+        pixbuf_or = get_pixbuf_from_svg(ICON_OR)
+
+        hboxOR = Gtk.HBox(spacing=15)
+        iconOR = Gtk.Image.new_from_pixbuf(pixbuf_or)
+        labelContentOR = _(
+            "<b>OR / Union / Disjunction</b>\n"
+            "Selects songs that match <b>ANY</b> selected term in a pane "
+            "(Default behavior)."
+        )
+        labelOR = Gtk.Label(xalign=0)
+        labelOR.set_markup(labelContentOR)
+        hboxOR.pack_start(iconOR, False, False, 0)
+        hboxOR.pack_start(labelOR, True, True, 0)
+
+        vbox.pack_start(hboxOR, False, False, 0)
+
+        hboxAND = Gtk.HBox(spacing=15)
+        iconAND = Gtk.Image.new_from_pixbuf(pixbuf_and)
+        labelContentAND = _(
+            "<b>AND / Intersection / Conjunction</b>\n"
+            "Selects songs that match <b>ALL</b> selected terms in a pane."
+        )
+        labelAND = Gtk.Label(xalign=0)
+        labelAND.set_markup(labelContentAND)
+        hboxAND.pack_start(iconAND, False, False, 0)
+        hboxAND.pack_start(labelAND, True, True, 0)
+
+        vbox.pack_start(hboxAND, False, False, 0)
+
+        return vbox
