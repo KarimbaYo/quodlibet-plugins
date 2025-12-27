@@ -31,6 +31,10 @@ The **Fade-out** plugin allows you to stop your music smoothly by gradually lowe
 - Smart Shortcut: Use the built-in recorder to set your preferred key combination (default: Ctrl+Shift+F).
 - Clean Integration: Adds a dedicated "Stop with fade-out" entry directly into the Control menu.
 
+#### Legend
+
+The **Legend** plugin adds a customizable text label to the application's status bar, allowing users to display a persistent reference guide for their library's metadata symbols or personal rating systems.
+
 ### /editing/
 
 #### RenamingTreeView
